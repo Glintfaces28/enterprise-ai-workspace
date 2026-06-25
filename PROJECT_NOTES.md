@@ -75,6 +75,33 @@ This file now includes Pydantic models for search results and chat requests/resp
 
 This file now registers the AI router with the FastAPI app.
 
+Frontend:
+React Dashboard
+
+Status:
+Completed on 25.06.2026.
+
+Completed:
+Built a complete React frontend connected to the FastAPI backend. Passes npm run build with zero errors.
+
+Files created (enterprise-ai-workspace/frontend/):
+- `src/api/client.js` — Axios instance with JWT interceptors
+- `src/context/AuthContext.jsx` — auth state in React Context + localStorage
+- `src/components/ProtectedRoute.jsx` — redirect unauthenticated users
+- `src/components/Layout.jsx` — responsive sidebar, mobile hamburger menu
+- `src/pages/Login.jsx` — login form with React Hook Form
+- `src/pages/Register.jsx` — registration form with auto-login
+- `src/pages/Dashboard.jsx` — stat cards + quick actions from /reports/summary
+- `src/pages/Documents.jsx` — drag-and-drop upload, list, download, delete
+- `src/pages/AiChat.jsx` — scrolling chat UI with source citations
+- `src/pages/Teams.jsx` — create teams, add/remove members, delete
+- `src/pages/Analytics.jsx` — metrics + per-user inline bar chart
+
+Backend change:
+`enterprise-ai-workspace/backend/main.py` — CORS middleware added for localhost:5173
+
+---
+
 Module 6:
 Teams & Permissions
 

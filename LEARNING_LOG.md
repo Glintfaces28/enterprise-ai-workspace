@@ -1491,6 +1491,437 @@ The changed Python files compiled successfully.
 
 ---
 
+## Frontend Module 1: Project Setup
+
+Day 6: 25.06.2026
+
+### Tech stack chosen
+
+| Tool | Purpose |
+|------|---------|
+| Vite | Build tool and dev server |
+| React 19 | UI library |
+| React Router DOM v6 | Client-side routing |
+| Axios | HTTP client for API calls |
+| Tailwind CSS v3 | Utility-first CSS styling |
+| React Hook Form | Form state and validation |
+| Lucide React | Modern icon library |
+
+---
+
+### Step 1: Add CORS to the FastAPI backend
+
+Updated:
+
+`enterprise-ai-workspace/backend/main.py`
+
+Added `CORSMiddleware`:
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+Learning:
+
+**What is CORS?**
+
+CORS (Cross-Origin Resource Sharing) is a browser security feature that blocks web pages from making requests to a different origin (domain, port, or protocol) than the one that served the page.
+
+When React runs on `http://localhost:5173` and the API runs on `http://localhost:8000`, they are different origins. Without CORS headers on the backend, the browser rejects every API response.
+
+`CORSMiddleware` adds `Access-Control-Allow-Origin` and related headers to every response so the browser allows the request.
+
+---
+
+### Step 2: Scaffold the Vite React project
+
+Commands:
+
+```bash
+cd enterprise-ai-workspace
+npm create vite@latest frontend -- --template react
+cd frontend
+npm install
+npm install react-router-dom axios lucide-react react-hook-form
+npm install -D tailwindcss@3 postcss autoprefixer
+npx tailwindcss init -p
+```
+
+Learning:
+
+**What is Vite?**
+
+Vite is a modern build tool for frontend projects. It starts a development server instantly using native ES modules and hot-reloads changes in milliseconds. It replaces the older Create React App (CRA) which is no longer maintained.
+
+**Why not CRA?**
+
+Create React App is deprecated. Vite is the current industry standard for React projects.
+
+**What is Tailwind CSS?**
+
+Tailwind is a utility-first CSS framework. Instead of writing custom CSS, you apply small utility classes directly to elements in your JSX:
+
+```jsx
+<button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+  Click me
+</button>
+```
+
+This builds professional-looking UIs quickly without maintaining a CSS file.
+
+**What is React Hook Form?**
+
+React Hook Form manages form state, input registration, and validation with minimal re-renders. It is faster and simpler than managing form state manually with `useState`.
+
+---
+
+### Step 3: Configure Tailwind
+
+Updated:
+
+`tailwind.config.js` — added content paths so Tailwind scans JSX files for class names:
+
+```js
+content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"]
+```
+
+Updated:
+
+`src/index.css` — replaced with Tailwind directives:
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+---
+
+## Frontend Module 2: Auth Infrastructure
+
+### Step 4: API client with interceptors
+
+Created:
+
+`src/api/client.js`
+
+An Axios instance that:
+- Points at `VITE_API_URL` (read from `.env`)
+- Automatically adds the `Authorization: Bearer <token>` header to every request
+- Automatically redirects to `/login` if any response is `401 Unauthorized`
+
+Learning:
+
+**What is an Axios interceptor?**
+
+Interceptors run before every request is sent (request interceptor) or after every response arrives (response interceptor). They let you apply shared behaviour — like attaching a token or handling errors — in one place rather than repeating it in every API call.
+
+**What is `import.meta.env`?**
+
+Vite exposes environment variables prefixed with `VITE_` through `import.meta.env`. We store the API URL in `.env` as `VITE_API_URL=http://localhost:8000`. In production, you change this one variable and every API call updates automatically.
+
+---
+
+### Step 5: Auth context and protected routes
+
+Created:
+
+`src/context/AuthContext.jsx`
+
+A React context that:
+- Stores the JWT token and user info in both component state and `localStorage`
+- Provides `login(token, username)` — decodes the JWT payload, extracts the email, stores both in state and localStorage
+- Provides `logout()` — clears state and localStorage
+- Provides `isAuthenticated` — boolean for route protection
+
+Created:
+
+`src/components/ProtectedRoute.jsx`
+
+```jsx
+export default function ProtectedRoute() {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+}
+```
+
+Learning:
+
+**What is React Context?**
+
+React Context lets you share state across many components without passing props down through every level. Auth state is a perfect use case — many components need to know if the user is logged in.
+
+**What is `localStorage`?**
+
+`localStorage` is a browser storage API that persists data across page reloads and browser sessions. Storing the JWT here means users stay logged in when they close and reopen the browser. It is cleared when `logout()` is called.
+
+**What is decoding a JWT client-side?**
+
+A JWT is three base64-encoded parts separated by dots. The middle part (payload) contains the claims — including `sub` (the user's email). `atob()` decodes base64, and `JSON.parse()` reads the payload object. No secret key is needed to read the payload — only to verify the signature.
+
+**What is `<Outlet />`?**
+
+In React Router v6, `<Outlet />` renders the matched child route. `ProtectedRoute` wraps the protected routes — if authenticated it renders them via `<Outlet />`; otherwise it redirects to login.
+
+---
+
+### Step 6: App router
+
+Created:
+
+`src/App.jsx`
+
+Sets up all routes:
+
+```jsx
+<Routes>
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+  <Route element={<ProtectedRoute />}>       {/* protected */}
+    <Route element={<Layout />}>             {/* with sidebar */}
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/documents" element={<Documents />} />
+      <Route path="/chat" element={<AiChat />} />
+      <Route path="/teams" element={<Teams />} />
+      <Route path="/analytics" element={<Analytics />} />
+    </Route>
+  </Route>
+  <Route path="*" element={<Navigate to="/" replace />} />
+</Routes>
+```
+
+Learning:
+
+**Nested routes in React Router v6**
+
+Routes can be nested. Here `ProtectedRoute` wraps all authenticated routes, and `Layout` (which renders the sidebar) wraps the actual page routes. This creates a clean hierarchy without repeating the sidebar in every page component.
+
+**`<Navigate to="/" replace />`**
+
+This catches any unknown URL and redirects to the dashboard. `replace` means the redirect does not appear in the browser history (so clicking Back does not return to the 404 URL).
+
+---
+
+## Frontend Module 3: Layout and Pages
+
+### Step 7: Responsive sidebar layout
+
+Created:
+
+`src/components/Layout.jsx`
+
+Features:
+- Fixed dark sidebar (`bg-slate-900`) on desktop, always visible
+- On mobile: sidebar is hidden; a hamburger button in the top bar slides it in as an overlay
+- `NavLink` highlights the active page with an indigo background
+- User avatar (initial letter) + username + email at the bottom
+- Sign out button clears auth state and redirects to login
+
+Learning:
+
+**Why `fixed md:relative` for the mobile sidebar?**
+
+On mobile, the sidebar needs to float over the page content (position: fixed). On desktop (md+), it sits in the normal document flow (position: relative) inside the flex container. The Tailwind breakpoint `md:` applies from 768px and above.
+
+**Tailwind responsive prefixes**
+
+`md:hidden` means hidden on medium screens and above. `md:translate-x-0` means no transform offset on medium screens and above. Tailwind's mobile-first approach means unprefixed classes apply to all sizes, and prefixed classes override from that breakpoint up.
+
+---
+
+### Step 8: Login and Register pages
+
+Created:
+
+`src/pages/Login.jsx` and `src/pages/Register.jsx`
+
+Both pages:
+- Use `useForm()` from React Hook Form for validation
+- Show a spinner while the request is in flight
+- Display error messages from the API response
+- Register automatically logs in (calls login API then auth context)
+
+Learning:
+
+**`{...register('email', { required: '...' })}`**
+
+`register()` from React Hook Form attaches `onChange`, `onBlur`, `ref`, and `name` props to the input. The second argument defines validation rules. No `useState` needed per field.
+
+**`handleSubmit(onSubmit)`**
+
+React Hook Form validates all fields before calling `onSubmit`. If any field is invalid, it shows the error messages and does not call the API.
+
+**Auto-login after register**
+
+After successful registration, we immediately call the login endpoint so the user lands on the dashboard without having to sign in again. This is a standard UX pattern.
+
+---
+
+### Step 9: Dashboard
+
+Created: `src/pages/Dashboard.jsx`
+
+Fetches `/reports/summary` on mount and displays:
+- 4 stat cards (documents, users, teams, storage)
+- Recent uploads highlight
+- 3 quick-action cards linking to Documents, AI Chat, and Teams
+
+Learning:
+
+**`useEffect(() => { fetch(); }, [])`**
+
+The empty dependency array `[]` means "run this effect once when the component mounts". This is how you load data when a page opens. Without `[]`, the effect would run on every re-render, causing an infinite loop.
+
+**Skeleton loading**
+
+While data is loading, the UI shows grey animated placeholders (`animate-pulse`) instead of a blank page. This is called a skeleton loader and improves perceived performance.
+
+---
+
+### Step 10: Documents page
+
+Created: `src/pages/Documents.jsx`
+
+Features:
+- Drag-and-drop upload area (also clickable)
+- Hidden `<input type="file">` triggered by the visible area
+- `FormData` for multipart upload via Axios
+- Document list with download and delete buttons
+- Download opens the backend URL in a new tab (no auth needed for downloads)
+
+Learning:
+
+**`FormData` for file uploads**
+
+File uploads use `multipart/form-data` encoding. `FormData` is the browser API for building this payload. You append the file with a field name matching the FastAPI parameter (`file`).
+
+**Why open download in a new tab?**
+
+The download endpoint returns a `FileResponse` — the raw file bytes. If we tried to download via Axios, we'd have to handle binary blobs manually. Opening `window.open(url)` triggers the browser's native download handling for free, since the download endpoint requires no authentication.
+
+---
+
+### Step 11: AI Chat page
+
+Created: `src/pages/AiChat.jsx`
+
+Features:
+- Chat history scrolls automatically to the latest message
+- User messages on the right (indigo), AI responses on the left (white)
+- Source passages displayed below AI answers
+- Typing indicator (spinner) while the API responds
+- Sends `POST /ai/chat` with the question
+
+Learning:
+
+**`useRef` for auto-scroll**
+
+`useRef` creates a reference to a DOM element. Calling `ref.current.scrollIntoView()` scrolls that element into view. We place the ref on a `<div>` at the bottom of the messages list and call `scrollIntoView` every time messages change.
+
+**Why `useEffect` depends on `[messages]`?**
+
+The auto-scroll effect needs to run every time a new message is added. Listing `messages` in the dependency array means "re-run this effect whenever messages changes".
+
+---
+
+### Step 12: Teams page
+
+Created: `src/pages/Teams.jsx`
+
+Features:
+- Team cards with name, description, owner badge
+- Create team form (inline, toggled by a button)
+- Add member modal (takes user ID + role)
+- Owner-only delete
+- `confirm()` dialog before deletion
+
+Learning:
+
+**Modal pattern without a library**
+
+A modal is a fixed overlay with a semi-transparent backdrop. Using `position: fixed; inset: 0` covers the whole screen. The form sits centred inside it. No external library needed.
+
+---
+
+### Step 13: Analytics page
+
+Created: `src/pages/Analytics.jsx`
+
+Features:
+- Metric cards loaded from `/reports/summary`
+- Per-user upload table from `/reports/documents/by-user`
+- Inline bar chart built with a simple `<div>` whose width is a percentage of the maximum value — no chart library needed
+- Both API calls run in parallel with `Promise.all`
+
+Learning:
+
+**`Promise.all`**
+
+`Promise.all([promise1, promise2])` runs both requests at the same time and resolves when both are done. This halves the loading time compared to running them sequentially with `await` one after the other.
+
+**Building a bar chart with pure CSS**
+
+A bar chart does not require a library. A `<div>` with a fixed container width and a child `<div>` whose width is set as a percentage creates a bar. The percentage comes from dividing the row value by the maximum value.
+
+---
+
+## Frontend Goals Achieved
+✅ CORS added to FastAPI backend
+✅ Vite + React project created with Tailwind, React Router, Axios, React Hook Form, Lucide
+✅ Axios client with request interceptor (auto token) and response interceptor (auto 401 redirect)
+✅ Auth context stores JWT and user in localStorage, survives page reload
+✅ Protected routes redirect unauthenticated users to login
+✅ Responsive sidebar layout — hamburger menu on mobile, fixed sidebar on desktop
+✅ Login and Register pages with validation and loading states
+✅ Dashboard with live stats from the backend
+✅ Documents page with drag-and-drop upload, download, delete
+✅ AI Chat page with scrolling history and source citations
+✅ Teams page with create, delete, and add member
+✅ Analytics page with metrics and inline bar chart
+✅ `npm run build` passes cleanly — 116 modules, 0 errors
+
+---
+
+## Interview Questions — React Frontend
+
+### What is Vite and why use it instead of CRA?
+Sample answer:
+Vite is a modern build tool that starts instantly using native ES modules and rebuilds in milliseconds. Create React App is deprecated, uses Webpack which is much slower, and is no longer maintained. The industry has moved to Vite.
+
+### What is CORS and why is it needed?
+Sample answer:
+CORS (Cross-Origin Resource Sharing) is a browser security policy that blocks requests from one origin to another. When a React app on port 5173 calls an API on port 8000, they are different origins. The server must send CORS headers to tell the browser the request is allowed.
+
+### What are Axios interceptors?
+Sample answer:
+Interceptors are functions that run automatically before every request is sent (request interceptor) or after every response arrives (response interceptor). In this project, a request interceptor adds the JWT header, and a response interceptor redirects to login on 401.
+
+### What is React Context?
+Sample answer:
+React Context is a way to share state across many components without prop drilling (passing props down through every level). Auth state — the current user and token — is shared across the whole app via `AuthContext`.
+
+### What is the difference between `useEffect` with `[]` and with `[messages]`?
+Sample answer:
+The dependency array controls when the effect re-runs. An empty array `[]` means "run once on mount". A dependency like `[messages]` means "re-run every time `messages` changes". Getting this wrong causes either missing updates or infinite loops.
+
+### How does drag-and-drop file upload work?
+Sample answer:
+The upload area listens for `onDragOver`, `onDragLeave`, and `onDrop` events. When a file is dropped, `event.dataTransfer.files[0]` gives the file. The file is then wrapped in `FormData` and sent to the API with `Content-Type: multipart/form-data`.
+
+### Why use `Promise.all` for multiple API calls?
+Sample answer:
+`Promise.all` runs multiple async operations in parallel. If two API calls each take 500ms, awaiting them sequentially takes 1000ms. Running them with `Promise.all` takes 500ms — they resolve together.
+
+---
+
 ## Module 10: Production Release
 
 Day 5: 25.06.2026

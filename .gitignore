@@ -11,6 +11,12 @@ __pycache__/
 # Uploaded files — belong on the server, not in source control
 uploads/
 
+# Frontend build output
+dist/
+
+# Node packages — installed from package.json
+node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
