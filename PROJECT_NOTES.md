@@ -191,6 +191,26 @@ Added `aws/` so the deployment scripts are not baked into the Docker image.
 Module 10:
 Production Release
 
+Status:
+Completed on 25.06.2026.
+
+Completed:
+Created .gitignore, README.md, initialised the git repository, and committed all 25 project files.
+
+Files created:
+`.gitignore`
+
+Excludes venv, .env, __pycache__, uploads, and OS files from version control.
+
+`README.md`
+
+Professional project documentation covering tech stack, features, project structure, local setup, Docker instructions, AWS deployment steps, and full API endpoint reference.
+
+Actions taken:
+`git init` — initialised the git repository at the project root.
+
+`git add` + `git commit` — committed all 25 project files as the initial commit (hash 33790a7).
+
 Day1--- 23.06.2026:   BACKEND FOUNDATION
 Workflow Achieved:-
 

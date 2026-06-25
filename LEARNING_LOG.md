@@ -1491,6 +1491,208 @@ The changed Python files compiled successfully.
 
 ---
 
+## Module 10: Production Release
+
+Day 5: 25.06.2026
+
+Step 1: Create .gitignore
+
+Created:
+
+`.gitignore` (at project root)
+
+```
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment — never commit secrets
+.env
+
+# Uploaded files — belong on the server, not in source control
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+Learning:
+
+**What is `.gitignore`?**
+
+`.gitignore` tells Git which files and folders to exclude from version control. Files listed here are never tracked, staged, or committed.
+
+**Why exclude `.env`?**
+
+`.env` contains database passwords and secret keys. If committed and pushed to GitHub, anyone with access to the repository could read your secrets. The `.env` file should only ever exist on the developer's local machine and on the production server.
+
+**Why exclude `venv/`?**
+
+The virtual environment contains thousands of files installed by pip. These are recreatable from `requirements.txt` by anyone who clones the project. Committing them wastes space and creates noise in git history.
+
+**Why exclude `uploads/`?**
+
+Uploaded files are user-generated content, not source code. They belong on the server's disk (or eventually in S3) — not in a code repository.
+
+**Why exclude `__pycache__/` and `*.pyc`?**
+
+Python compiles `.py` files into bytecode (`.pyc`) and caches them in `__pycache__/`. These are machine-specific and regenerated automatically. Committing them serves no purpose and creates merge conflicts across different machines.
+
+Confirmed with:
+
+```bash
+git check-ignore -v enterprise-ai-workspace/backend/.env
+git check-ignore -v enterprise-ai-workspace/backend/venv/activate
+```
+
+Both returned the matching `.gitignore` rule — confirmed they are being ignored correctly.
+
+---
+
+Step 2: Create README.md
+
+Created:
+
+`README.md` (at project root)
+
+The README covers:
+
+- Project overview and purpose
+- Full tech stack table
+- Feature list
+- Complete project structure with file descriptions
+- Local development setup instructions
+- Docker setup instructions
+- AWS deployment overview
+- Complete API endpoint reference table
+- Environment variable reference
+
+Learning:
+
+**Why does a good README matter?**
+
+The README is the first thing a hiring manager or recruiter sees when they visit your GitHub repository. A clear, well-structured README shows:
+
+- You can communicate technical information clearly
+- You think about how your work will be used by others
+- You understand the full scope of what you built
+
+**What belongs in a production README?**
+
+At minimum: what the project does, the tech stack, how to run it, and what endpoints exist. A README that just says "FastAPI project" tells a reviewer nothing. A README that shows architecture, features, and deployment steps demonstrates engineering depth.
+
+---
+
+Step 3: Initialise the git repository
+
+Command:
+
+```bash
+git init
+```
+
+Result:
+
+```
+Initialized empty Git repository in C:/xampp/htdocs/Enterprise-AI-Workspace/.git/
+```
+
+Learning:
+
+`git init` creates a hidden `.git/` folder at the root of the project. This folder is the entire git database — it stores every version of every file you ever commit. You only run `git init` once at the beginning of a project.
+
+---
+
+Step 4: Stage and commit all files
+
+Commands:
+
+```bash
+git add .gitignore LEARNING_LOG.md PROJECT_NOTES.md README.md enterprise-ai-workspace/
+git commit -m "Initial commit: Enterprise AI Workspace API"
+```
+
+Result:
+
+```
+[master (root-commit) 33790a7] Initial commit: Enterprise AI Workspace API
+25 files changed, 3358 insertions(+)
+```
+
+Learning:
+
+**What does `git add` do?**
+
+`git add` moves files into the staging area. The staging area is a preparation zone — you choose exactly what goes into the next commit. Unstaged changes exist on disk but are not recorded in git history.
+
+**What does `git commit` do?**
+
+`git commit` takes everything in the staging area and saves it as a permanent snapshot in git history. Each commit has a unique hash (like `33790a7`). You can always go back to any previous commit.
+
+**What should a commit message say?**
+
+A good commit message says what changed and why. The first line should be short (under 72 characters) and use the imperative form: "Add feature", not "Added feature". Additional detail goes on the lines below.
+
+---
+
+### How to push to GitHub
+
+After creating a new empty repository on GitHub:
+
+```bash
+git remote add origin https://github.com/<your-username>/enterprise-ai-workspace.git
+git branch -M main
+git push -u origin main
+```
+
+After that, every future update is:
+
+```bash
+git add <changed-files>
+git commit -m "Describe the change"
+git push
+```
+
+---
+
+## Module 10 Goals Achieved
+✅ Created `.gitignore` — excludes .env, venv, uploads, __pycache__
+✅ Verified .env and venv are correctly ignored with `git check-ignore`
+✅ Created `README.md` — professional project documentation for GitHub
+✅ Ran `git init` — repository initialised at project root
+✅ Made initial commit — 25 files, 3358 lines
+✅ Learned: .gitignore rules, git init, git add, git commit, git remote, git push
+
+---
+
+## Interview Questions — Module 10
+
+### What is the purpose of .gitignore?
+Sample answer:
+`.gitignore` tells Git which files to exclude from version control. It is used to prevent committing secrets like `.env`, large generated files like `venv/`, and machine-specific files like `__pycache__/`.
+
+### Should .env ever be committed to GitHub?
+Sample answer:
+Never. `.env` contains database passwords, secret keys, and other credentials. If committed, anyone with access to the repository can read those secrets. The correct approach is to commit `.env.example` with placeholder values and add `.env` to `.gitignore`.
+
+### What is the difference between git add and git commit?
+Sample answer:
+`git add` moves changes into the staging area — a preparation zone. `git commit` takes everything staged and saves it as a permanent snapshot. Separating the two lets you choose exactly what goes into each commit.
+
+### What is a commit hash?
+Sample answer:
+A commit hash is a unique identifier for each commit, generated by hashing the commit's contents. It lets you reference any specific point in history. You can use it to check out old code, revert changes, or identify which commit introduced a bug.
+
+### Why should secrets not be stored in git history?
+Sample answer:
+Git history is permanent — even if you delete a file and commit again, the secret is still visible in older commits. If you accidentally commit a secret, you must rotate it immediately and optionally rewrite history with tools like `git filter-branch` or BFG Repo Cleaner.
+
+---
+
 ## Module 9: AWS Deployment
 
 Day 5: 25.06.2026
