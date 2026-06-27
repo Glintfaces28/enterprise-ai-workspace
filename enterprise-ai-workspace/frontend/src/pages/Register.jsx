@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Brain, Loader2 } from 'lucide-react';
-import api from '../api/client';
+import api, { API_BASE_URL } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
@@ -29,7 +29,11 @@ export default function Register() {
       login(res.data.access_token, data.username);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Try a different email.');
+      if (!err.response) {
+        setError(`Cannot connect to ${API_BASE_URL}. Browser error: ${err.message}`);
+      } else {
+        setError(err.response.data?.detail || 'Registration failed.');
+      }
     } finally {
       setLoading(false);
     }

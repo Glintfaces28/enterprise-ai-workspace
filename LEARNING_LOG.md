@@ -1196,6 +1196,170 @@ Learning:
 
 `py_compile` checks Python syntax and import-time parse errors for specific files. It is useful when a full app run or database-backed test is not needed for the current step.
 
+Step 4: Fix frontend connection error
+
+Problem:
+
+The registration page showed:
+
+`Cannot connect to the server. Make sure the backend is running on port 8000.`
+
+Cause:
+
+The frontend was configured correctly to call `http://localhost:8000`, but the FastAPI backend was not running on port 8000.
+
+Command:
+
+`enterprise-ai-workspace\backend\venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000`
+
+Verification:
+
+`GET http://127.0.0.1:8000/health`
+
+Result:
+
+The backend returned `{"status":"healthy"}`.
+
+Learning:
+
+When a frontend cannot connect to an API, first check whether the backend server is running, then verify the API base URL, CORS settings, and health endpoint.
+
+Step 5: Fix local development CORS origin
+
+Problem:
+
+The backend was running and `/health` returned successfully, but the frontend could still show the connection error.
+
+Cause:
+
+The backend CORS settings allowed `http://localhost:5173`, but not `http://127.0.0.1:5173`. Browsers treat `localhost` and `127.0.0.1` as different origins.
+
+Updated:
+
+`enterprise-ai-workspace/backend/main.py`
+
+Purpose:
+
+Added `127.0.0.1` frontend origins for ports `5173` and `3000`.
+
+Verification:
+
+The backend returned `200 OK` for CORS preflight requests to `/auth/register` from both:
+
+`http://127.0.0.1:5173`
+
+`http://localhost:5173`
+
+Learning:
+
+CORS errors often appear in frontend code as a generic network failure. The backend can be healthy while the browser still blocks the request because the frontend origin is not allowed.
+
+Step 6: Use a clean backend development port
+
+Problem:
+
+The browser still showed the connection error after the backend health endpoint worked.
+
+Cause:
+
+An old process was still answering on port `8000`, so the edited CORS settings were not reliably being served from that port.
+
+Updated:
+
+`enterprise-ai-workspace/frontend/.env`
+
+Purpose:
+
+Changed the frontend API URL to:
+
+`VITE_API_URL=http://localhost:8010`
+
+Updated:
+
+`enterprise-ai-workspace/frontend/src/api/client.js`
+
+Purpose:
+
+Changed the fallback API URL to use port `8010` and exported `API_BASE_URL` so connection errors can show which backend URL the browser tried.
+
+Updated:
+
+`enterprise-ai-workspace/frontend/src/pages/Register.jsx`
+
+Purpose:
+
+The registration page now shows the API URL and browser error message when the request has no response.
+
+Updated:
+
+`enterprise-ai-workspace/frontend/src/pages/Login.jsx`
+
+Purpose:
+
+The login page now shows the API URL and browser error message when the request has no response.
+
+Verification:
+
+Started FastAPI on port `8010`.
+
+Started Vite on port `5173`.
+
+Confirmed:
+
+`GET http://localhost:8010/health` returned `200 OK`.
+
+`OPTIONS http://localhost:8010/auth/register` returned `200 OK` for a local frontend origin.
+
+`POST http://localhost:8010/auth/register` created a test user successfully.
+
+`GET http://127.0.0.1:5173` returned `200 OK`.
+
+Learning:
+
+When a port is occupied by an old server process, changing files is not enough. The running server must be restarted, or the frontend can be pointed to a clean development port.
+
+Step 7: Improve AI Chat for broad document questions
+
+Problem:
+
+AI Chat returned:
+
+`I could not find a relevant answer in the uploaded PDF documents.`
+
+This happened even though a PDF was uploaded.
+
+Cause:
+
+The first Module 5 search logic was very literal. It only returned passages when the user's question shared exact keywords with the PDF text. Broad questions like `tell me what this document is about` can contain mostly generic words, so the search found no match.
+
+Updated:
+
+`enterprise-ai-workspace/backend/services/document_search.py`
+
+Purpose:
+
+Improved the document search service by:
+
+- ignoring common English and German stopwords
+- treating broad/generic questions as overview requests
+- returning the first useful readable PDF passage when no exact keyword match is found
+- skipping tiny PDF headings such as `AUSBILDUNG` when building overview answers
+- returning a clearer message when a PDF has no readable text and may need OCR
+
+Verification:
+
+Asked the backend:
+
+`tell me what this document is about`
+
+Result:
+
+The backend returned a useful answer from `Oghale_Gladys_Eni_CV_Fachinformatikerin.pdf`, including context about Fachinformatikerin training and technologies such as Python, FastAPI, JavaScript, SQL, PostgreSQL, and React.
+
+Learning:
+
+PDF text extraction often returns short lines or headings instead of clean paragraphs. Search logic should handle generic questions and skip weak passages so the chat feels useful even before adding a real LLM.
+
 ---
 
 ## Module 6: Teams & Permissions

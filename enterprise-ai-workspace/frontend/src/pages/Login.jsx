@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Brain, Loader2 } from 'lucide-react';
-import api from '../api/client';
+import api, { API_BASE_URL } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -20,7 +20,11 @@ export default function Login() {
       login(res.data.access_token);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid email or password.');
+      if (!err.response) {
+        setError(`Cannot connect to ${API_BASE_URL}. Browser error: ${err.message}`);
+      } else {
+        setError(err.response.data?.detail || 'Invalid email or password.');
+      }
     } finally {
       setLoading(false);
     }
