@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Brain, Loader2 } from 'lucide-react';
 import api, { API_BASE_URL } from '../api/client';
@@ -9,8 +9,16 @@ export default function Login() {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const successMessage = location.state?.message || '';
+  const { isAuthenticated } = useAuth();
+
+  // Already logged in → send to dashboard
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   async function onSubmit(data) {
     setLoading(true);
@@ -42,6 +50,12 @@ export default function Login() {
           <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome back</h2>
           <p className="text-gray-500 text-sm mb-6">Sign in to your workspace</p>
 
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 mb-4 text-sm">
+              {successMessage}
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-4 text-sm">
               {error}
@@ -66,9 +80,14 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <Link to="/forgot-password" className="text-xs text-indigo-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 {...register('password', { required: 'Password is required' })}
                 type="password"

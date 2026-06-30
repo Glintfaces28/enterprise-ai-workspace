@@ -15,12 +15,19 @@ UPLOAD_DIR = Path("uploads")
 
 
 @router.get("/documents")
-def get_documents(db: Session = Depends(get_db)):
+def get_documents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     return db.query(models.Document).all()
 
 
 @router.get("/documents/{document_id}")
-def get_document(document_id: int, db: Session = Depends(get_db)):
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     document = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -61,7 +68,11 @@ def upload_document(
 
 
 @router.get("/documents/{document_id}/download")
-def download_document(document_id: int, db: Session = Depends(get_db)):
+def download_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     document = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -78,7 +89,11 @@ def download_document(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/documents/{document_id}/content")
-def read_document_content(document_id: int, db: Session = Depends(get_db)):
+def read_document_content(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     document = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")

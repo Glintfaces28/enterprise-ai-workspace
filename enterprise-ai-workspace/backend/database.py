@@ -19,7 +19,7 @@ if DATABASE_URL is None:
         database=os.getenv("DB_NAME", "enterprise_ai_workspace"),
 )
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"connect_timeout": 5})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

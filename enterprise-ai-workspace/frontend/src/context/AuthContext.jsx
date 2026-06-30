@@ -2,24 +2,36 @@ import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext(null);
 
+function userFromToken(accessToken) {
+  if (!accessToken) return null;
+
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1]));
+    return {
+      id: payload.user_id,
+      email: payload.sub,
+      username: payload.sub?.split('@')[0] || 'User',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem('user') || 'null')
-  );
+  const storedToken = localStorage.getItem('token');
+  const [token, setToken] = useState(storedToken);
+  const [user, setUser] = useState(userFromToken(storedToken));
 
   function login(accessToken, username) {
-    const payload = JSON.parse(atob(accessToken.split('.')[1]));
-    const userData = { email: payload.sub, username: username || payload.sub.split('@')[0] };
+    const userData = userFromToken(accessToken);
+    if (username && userData) userData.username = username;
     localStorage.setItem('token', accessToken);
-    localStorage.setItem('user', JSON.stringify(userData));
     setToken(accessToken);
     setUser(userData);
   }
 
   function logout() {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
     setToken(null);
     setUser(null);
   }

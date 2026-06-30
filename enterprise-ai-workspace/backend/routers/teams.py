@@ -4,9 +4,68 @@ from sqlalchemy.orm import Session
 from database import get_db
 from dependencies import get_current_user
 from models import Team, TeamMember, User
-from schemas import TeamCreate, TeamMemberAdd, TeamMemberOut, TeamOut
+from schemas import TeamCreate, TeamDetailOut, TeamMemberAdd, TeamMemberOut, TeamOut
 
-router = APIRouter(prefix="/teams", tags=["teams"])
+router = APIRouter(prefix="/api/teams", tags=["teams"])
+
+
+def get_team_or_404(team_id: int, db: Session) -> Team:
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team
+
+
+def get_membership(team_id: int, user_id: int, db: Session) -> TeamMember | None:
+    return (
+        db.query(TeamMember)
+        .filter(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
+        .first()
+    )
+
+
+def require_member(team_id: int, current_user: User, db: Session) -> TeamMember:
+    membership = get_membership(team_id, current_user.id, db)
+    if not membership:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+    return membership
+
+
+def require_owner(team: Team, current_user: User):
+    if team.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the team owner can do this")
+
+
+def require_admin_or_owner(team: Team, current_user: User, db: Session):
+    membership = get_membership(team.id, current_user.id, db)
+    if not membership or membership.role not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="Only team owners and admins can do this")
+
+
+def serialize_member(member: TeamMember, user: User) -> TeamMemberOut:
+    return TeamMemberOut(
+        id=member.id,
+        user_id=member.user_id,
+        username=user.username,
+        email=user.email,
+        role=member.role,
+        joined_at=member.joined_at,
+    )
+
+
+def serialize_team(team: Team, current_user: User, db: Session) -> TeamOut:
+    membership = get_membership(team.id, current_user.id, db)
+    member_count = db.query(TeamMember).filter(TeamMember.team_id == team.id).count()
+    return TeamOut(
+        id=team.id,
+        name=team.name,
+        description=team.description,
+        created_by=team.created_by,
+        created_at=team.created_at,
+        member_count=member_count,
+        my_role=membership.role if membership else None,
+        is_owner=team.created_by == current_user.id,
+    )
 
 
 @router.post("", response_model=TeamOut, status_code=201)
@@ -19,16 +78,20 @@ def create_team(
     if existing:
         raise HTTPException(status_code=400, detail="Team name already taken")
 
-    team = Team(name=data.name, description=data.description, owner_id=current_user.id)
+    team = Team(
+        name=data.name.strip(),
+        description=data.description.strip() if data.description else None,
+        created_by=current_user.id,
+    )
     db.add(team)
     db.commit()
     db.refresh(team)
 
-    member = TeamMember(team_id=team.id, user_id=current_user.id, role="admin")
-    db.add(member)
+    owner = TeamMember(team_id=team.id, user_id=current_user.id, role="owner")
+    db.add(owner)
     db.commit()
 
-    return team
+    return serialize_team(team, current_user, db)
 
 
 @router.get("", response_model=list[TeamOut])
@@ -37,28 +100,35 @@ def list_teams(
     current_user: User = Depends(get_current_user),
 ):
     memberships = db.query(TeamMember).filter(TeamMember.user_id == current_user.id).all()
-    team_ids = [m.team_id for m in memberships]
-    return db.query(Team).filter(Team.id.in_(team_ids)).all()
+    team_ids = [membership.team_id for membership in memberships]
+    if not team_ids:
+        return []
+
+    teams = db.query(Team).filter(Team.id.in_(team_ids)).order_by(Team.created_at.desc()).all()
+    return [serialize_team(team, current_user, db) for team in teams]
 
 
-@router.get("/{team_id}", response_model=TeamOut)
+@router.get("/{team_id}", response_model=TeamDetailOut)
 def get_team(
     team_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+    team = get_team_or_404(team_id, db)
+    require_member(team_id, current_user, db)
 
-    membership = db.query(TeamMember).filter(
-        TeamMember.team_id == team_id,
-        TeamMember.user_id == current_user.id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
-
-    return team
+    rows = (
+        db.query(TeamMember, User)
+        .join(User, User.id == TeamMember.user_id)
+        .filter(TeamMember.team_id == team_id)
+        .order_by(TeamMember.joined_at.asc())
+        .all()
+    )
+    team_out = serialize_team(team, current_user, db)
+    return TeamDetailOut(
+        **team_out.model_dump(),
+        members=[serialize_member(member, user) for member, user in rows],
+    )
 
 
 @router.post("/{team_id}/members", response_model=TeamMemberOut, status_code=201)
@@ -68,34 +138,23 @@ def add_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+    team = get_team_or_404(team_id, db)
+    require_admin_or_owner(team, current_user, db)
 
-    caller = db.query(TeamMember).filter(
-        TeamMember.team_id == team_id,
-        TeamMember.user_id == current_user.id,
-    ).first()
-    if not caller or caller.role != "admin":
-        raise HTTPException(status_code=403, detail="Only team admins can add members")
-
-    user = db.query(User).filter(User.id == data.user_id).first()
+    user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    already_member = db.query(TeamMember).filter(
-        TeamMember.team_id == team_id,
-        TeamMember.user_id == data.user_id,
-    ).first()
+    already_member = get_membership(team_id, user.id, db)
     if already_member:
         raise HTTPException(status_code=400, detail="User is already a member")
 
-    member = TeamMember(team_id=team_id, user_id=data.user_id, role=data.role)
+    member = TeamMember(team_id=team_id, user_id=user.id, role=data.role)
     db.add(member)
     db.commit()
     db.refresh(member)
 
-    return member
+    return serialize_member(member, user)
 
 
 @router.delete("/{team_id}/members/{user_id}", status_code=204)
@@ -105,24 +164,13 @@ def remove_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+    team = get_team_or_404(team_id, db)
+    require_owner(team, current_user)
 
-    caller = db.query(TeamMember).filter(
-        TeamMember.team_id == team_id,
-        TeamMember.user_id == current_user.id,
-    ).first()
-    if not caller or caller.role != "admin":
-        raise HTTPException(status_code=403, detail="Only team admins can remove members")
-
-    if user_id == team.owner_id:
+    if user_id == team.created_by:
         raise HTTPException(status_code=400, detail="Cannot remove the team owner")
 
-    member = db.query(TeamMember).filter(
-        TeamMember.team_id == team_id,
-        TeamMember.user_id == user_id,
-    ).first()
+    member = get_membership(team_id, user_id, db)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
@@ -136,12 +184,8 @@ def delete_team(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
-    if team.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the team owner can delete the team")
+    team = get_team_or_404(team_id, db)
+    require_owner(team, current_user)
 
     db.query(TeamMember).filter(TeamMember.team_id == team_id).delete()
     db.delete(team)

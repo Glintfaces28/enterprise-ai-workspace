@@ -1,8 +1,11 @@
+import logging
 import re
 from pathlib import Path
 
 import models
 from services.pdf_reader import read_pdf
+
+logger = logging.getLogger(__name__)
 
 STOPWORDS = {
     "a",
@@ -108,6 +111,14 @@ def _document_passages(document: models.Document) -> list[str]:
     return _split_passages(text)
 
 
+def _metadata_passage(document: models.Document, passages: list[str]) -> str:
+    readable_name = Path(document.filename).stem.replace("_", " ").replace("-", " ")
+    extracted_summary = " ".join(passages[:3]).strip()
+    if extracted_summary:
+        return f"Document title: {readable_name}. Extracted certificate/document text: {extracted_summary}"
+    return f"Document title: {readable_name}."
+
+
 def _overview_results(documents: list[models.Document], limit: int) -> list[dict]:
     results = []
 
@@ -133,25 +144,69 @@ def _overview_results(documents: list[models.Document], limit: int) -> list[dict
     return results
 
 
-def search_documents(db, query: str, limit: int = 5, document_id: int | None = None) -> list[dict]:
+def _diversified_results(results: list[dict], document_ids: list[int], limit: int) -> list[dict]:
+    selected = []
+    used_indexes = set()
+
+    for document_id in document_ids:
+        for index, result in enumerate(results):
+            if index not in used_indexes and result["document_id"] == document_id:
+                selected.append(result)
+                used_indexes.add(index)
+                break
+
+        if len(selected) >= limit:
+            return selected
+
+    for index, result in enumerate(results):
+        if index not in used_indexes:
+            selected.append(result)
+        if len(selected) >= limit:
+            break
+
+    return selected
+
+
+def search_documents(
+    db,
+    query: str,
+    limit: int = 5,
+    document_id: int | None = None,
+    document_ids: list[int] | None = None,
+) -> list[dict]:
     query_tokens = _query_tokens(query)
 
     documents_query = db.query(models.Document)
-    if document_id is not None:
+    if document_ids:
+        documents_query = documents_query.filter(models.Document.id.in_(document_ids))
+    elif document_id is not None:
         documents_query = documents_query.filter(models.Document.id == document_id)
 
     documents = documents_query.all()
+    logger.warning(
+        "Document search filter document_ids=%s document_id=%s matched_documents=%s",
+        document_ids,
+        document_id,
+        [document.id for document in documents],
+    )
+
     if not query_tokens:
         return _overview_results(documents, limit)
 
     results = []
+    chunk_stats = {}
     for document in documents:
         if not _is_pdf_document(document):
             continue
 
-        for passage in _document_passages(document):
+        passages = _document_passages(document)
+        passages_with_metadata = [_metadata_passage(document, passages), *passages]
+        matches_for_document = 0
+
+        for passage in passages_with_metadata:
             score = _score_passage(query_tokens, passage)
             if score > 0:
+                matches_for_document += 1
                 results.append(
                     {
                         "document_id": document.id,
@@ -160,9 +215,18 @@ def search_documents(db, query: str, limit: int = 5, document_id: int | None = N
                         "passage": passage,
                     }
                 )
+        chunk_stats[document.id] = {
+            "filename": document.filename,
+            "chunks": len(passages_with_metadata),
+            "matching_chunks": matches_for_document,
+        }
+
+    logger.warning("Document search chunk stats=%s", chunk_stats)
 
     results.sort(key=lambda result: result["score"], reverse=True)
     if results:
+        if document_ids and len(document_ids) > 1:
+            return _diversified_results(results, document_ids, limit)
         return results[:limit]
 
     return _overview_results(documents, limit)
@@ -174,6 +238,19 @@ def build_document_answer(query: str, results: list[dict]) -> str:
             "I found no readable text in the uploaded PDF documents. "
             "If the PDF is scanned, it may need OCR before I can search it."
         )
+
+    unique_filenames = []
+    for result in results:
+        if result["filename"] not in unique_filenames:
+            unique_filenames.append(result["filename"])
+
+    if len(unique_filenames) > 1:
+        source_list = ", ".join(unique_filenames)
+        evidence = " ".join(
+            f"{result['filename']}: {result['passage']}"
+            for result in results[: min(len(results), 4)]
+        )
+        return f"Based on {source_list}, the relevant information I found is: {evidence}"
 
     best_passage = results[0]["passage"]
     filename = results[0]["filename"]

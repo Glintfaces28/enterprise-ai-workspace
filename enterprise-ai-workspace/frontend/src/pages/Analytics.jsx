@@ -1,134 +1,168 @@
 import { useEffect, useState } from 'react';
 import {
-  FileText, Users, BarChart3, HardDrive,
-  TrendingUp, Loader2,
+  Activity,
+  FileText,
+  HardDrive,
+  Loader2,
+  Users,
 } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import api from '../api/client';
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
+  if (!bytes) return '0 KB';
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function MetricCard({ icon: Icon, label, value, sub, color }) {
+function formatDay(value) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function MetricCard({ icon: Icon, label, value, color }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon size={18} className="text-white" />
+    <div className="bg-white border border-gray-200 rounded-lg p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{label}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
         </div>
-        <p className="text-sm text-gray-500 font-medium">{label}</p>
+        <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${color}`}>
+          <Icon size={21} className="text-white" />
+        </div>
       </div>
-      <p className="text-3xl font-bold text-gray-900">{value ?? '—'}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function ChartCard({ title, data, dataKey, stroke }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-5">
+      <h2 className="font-semibold text-gray-900 mb-4">{title}</h2>
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 16, left: -18, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDay}
+              tick={{ fontSize: 12, fill: '#6B7280' }}
+              stroke="#D1D5DB"
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 12, fill: '#6B7280' }}
+              stroke="#D1D5DB"
+            />
+            <Tooltip
+              labelFormatter={formatDay}
+              contentStyle={{
+                borderRadius: 8,
+                border: '1px solid #E5E7EB',
+                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)',
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey={dataKey}
+              stroke={stroke}
+              strokeWidth={3}
+              dot={{ r: 4, strokeWidth: 2 }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
 
 export default function Analytics() {
-  const [summary, setSummary] = useState(null);
-  const [userStats, setUserStats] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      api.get('/reports/summary'),
-      api.get('/reports/documents/by-user'),
-    ])
-      .then(([s, u]) => {
-        setSummary(s.data);
-        setUserStats(u.data);
-      })
-      .catch(() => {})
+    api.get('/api/analytics')
+      .then((res) => setAnalytics(res.data))
+      .catch((err) => setError(err.response?.data?.detail || 'Could not load analytics.'))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center h-64">
-        <Loader2 size={28} className="animate-spin text-indigo-500" />
+      <div className="p-6 h-72 flex items-center justify-center">
+        <Loader2 size={30} className="animate-spin text-indigo-500" />
       </div>
     );
   }
 
-  const maxCount = Math.max(...userStats.map((u) => u.document_count), 1);
+  const totals = analytics?.totals || {};
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-gray-500 mt-1">Workspace usage and activity overview.</p>
+        <p className="text-gray-500 mt-1">Workspace activity, storage, and AI usage.</p>
       </div>
 
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-5 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
         <MetricCard
           icon={FileText}
-          label="Total Documents"
-          value={summary?.total_documents}
-          color="bg-indigo-500"
+          label="Total documents"
+          value={totals.documents ?? 0}
+          color="bg-indigo-600"
         />
         <MetricCard
-          icon={Users}
-          label="Total Users"
-          value={summary?.total_users}
-          color="bg-emerald-500"
-        />
-        <MetricCard
-          icon={BarChart3}
-          label="Total Teams"
-          value={summary?.total_teams}
-          color="bg-amber-500"
+          icon={Activity}
+          label="Total AI queries"
+          value={totals.ai_queries ?? 0}
+          color="bg-emerald-600"
         />
         <MetricCard
           icon={HardDrive}
-          label="Storage Used"
-          value={formatBytes(summary?.total_storage_bytes)}
+          label="Storage used"
+          value={formatBytes(totals.storage_bytes)}
+          color="bg-amber-500"
+        />
+        <MetricCard
+          icon={Users}
+          label="Team members"
+          value={totals.team_members ?? 0}
           color="bg-rose-500"
         />
       </div>
 
-      {/* Recent uploads highlight */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-8 flex items-center gap-3">
-        <TrendingUp size={20} className="text-indigo-500 shrink-0" />
-        <p className="text-indigo-800 text-sm">
-          <span className="font-bold">{summary?.recent_uploads_7_days ?? 0}</span>
-          {' '}document{summary?.recent_uploads_7_days !== 1 ? 's' : ''} uploaded in the last 7 days
-        </p>
-      </div>
-
-      {/* Per-user table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Documents by user</h2>
-        </div>
-        {userStats.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-10">No data yet.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {userStats.map((row, i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-3">
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold shrink-0">
-                  {row.username?.[0]?.toUpperCase() || '?'}
-                </div>
-                <span className="flex-1 text-sm text-gray-800 font-medium">{row.username}</span>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-500 rounded-full"
-                      style={{ width: `${(row.document_count / maxCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900 w-6 text-right">
-                    {row.document_count}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ChartCard
+          title="Documents uploaded over time"
+          data={analytics?.documents_over_time || []}
+          dataKey="documents"
+          stroke="#4F46E5"
+        />
+        <ChartCard
+          title="AI queries over time"
+          data={analytics?.ai_queries_over_time || []}
+          dataKey="ai_queries"
+          stroke="#059669"
+        />
       </div>
     </div>
   );

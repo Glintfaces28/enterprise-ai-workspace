@@ -5,6 +5,16 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from database import Base
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -34,7 +44,7 @@ class Team(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     description = Column(String, nullable=True)
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -46,3 +56,13 @@ class TeamMember(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     role = Column(String, default="member", nullable=False)
     joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AIQuery(Base):
+    __tablename__ = "ai_queries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    query_text = Column(String, nullable=False)
+    query_type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -20,6 +20,15 @@ class Token(BaseModel):
     token_type: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+
+
 class DocumentSearchResult(BaseModel):
     document_id: int
     filename: str
@@ -35,6 +44,7 @@ class SearchResponse(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1)
     document_id: int | None = None
+    document_ids: list[int] | None = None
     max_results: int = Field(default=5, ge=1, le=20)
 
 
@@ -55,21 +65,31 @@ class TeamOut(BaseModel):
     id: int
     name: str
     description: str | None
-    owner_id: int
+    created_by: int
     created_at: datetime
+    member_count: int = 0
+    my_role: str | None = None
+    is_owner: bool = False
 
 
 class TeamMemberAdd(BaseModel):
-    user_id: int
+    email: str
     role: Literal["admin", "member"] = "member"
 
 
 class TeamMemberOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
     user_id: int
+    username: str
+    email: str
     role: str
     joined_at: datetime
+
+
+class TeamDetailOut(TeamOut):
+    members: list[TeamMemberOut] = []
 
 
 class WorkspaceSummary(BaseModel):

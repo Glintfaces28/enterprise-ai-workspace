@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, Bot, User, Loader2, FileText } from 'lucide-react';
+import { Send, Bot, User, Loader2, FileText, CheckSquare, Square } from 'lucide-react';
 import api from '../api/client';
 
 function Message({ msg }) {
@@ -41,13 +41,35 @@ export default function AiChat() {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Hello! Ask me anything about your uploaded documents.' },
   ]);
+  const [documents, setDocuments] = useState([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
+    api.get('/documents')
+      .then((res) => setDocuments(res.data))
+      .catch(() => setDocuments([]))
+      .finally(() => setLoadingDocuments(false));
+  }, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  function toggleDocument(documentId) {
+    setSelectedDocumentIds((prev) =>
+      prev.includes(documentId)
+        ? prev.filter((id) => id !== documentId)
+        : [...prev, documentId]
+    );
+  }
+
+  function clearSelection() {
+    setSelectedDocumentIds([]);
+  }
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -59,7 +81,13 @@ export default function AiChat() {
     setLoading(true);
 
     try {
-      const res = await api.post('/ai/chat', { question, max_results: 3 });
+      const payload = {
+        question,
+        max_results: 3,
+        document_ids: selectedDocumentIds.length ? selectedDocumentIds : null,
+      };
+      console.debug('AI chat payload', payload);
+      const res = await api.post('/ai/chat', payload);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: res.data.answer, sources: res.data.sources },
@@ -105,7 +133,58 @@ export default function AiChat() {
         onSubmit={sendMessage}
         className="shrink-0 px-6 py-4 border-t border-gray-200 bg-white"
       >
-        <div className="flex gap-3 max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-3">
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Documents
+              </p>
+              {selectedDocumentIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  Search all
+                </button>
+              )}
+            </div>
+            {loadingDocuments ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <Loader2 size={14} className="animate-spin" />
+                Loading documents...
+              </div>
+            ) : documents.length === 0 ? (
+              <p className="text-sm text-gray-400">No documents uploaded yet. Upload documents to narrow chat context.</p>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {documents.map((doc) => {
+                  const selected = selectedDocumentIds.includes(doc.id);
+                  return (
+                    <label
+                      key={doc.id}
+                      className={`shrink-0 inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors max-w-xs ${
+                        selected
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                      title={doc.filename}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleDocument(doc.id)}
+                        className="sr-only"
+                      />
+                      {selected ? <CheckSquare size={15} /> : <Square size={15} />}
+                      <span className="truncate">{doc.filename}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -121,6 +200,7 @@ export default function AiChat() {
             <Send size={16} />
             <span className="hidden sm:inline text-sm font-medium">Send</span>
           </button>
+          </div>
         </div>
       </form>
     </div>
