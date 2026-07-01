@@ -28,7 +28,7 @@ function SidebarNav({ onClose }) {
       <div className="p-6 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Brain className="text-indigo-400" size={26} />
-          <span className="text-white font-bold text-base">Enterprise AI</span>
+          <span className="text-white font-bold text-base">Ogelytics AI</span>
         </div>
         {onClose && (
           <button onClick={onClose} className="text-slate-400 hover:text-white md:hidden">
@@ -116,7 +116,7 @@ export default function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <Brain className="text-indigo-600" size={20} />
-            <span className="font-bold text-gray-900 text-sm">Enterprise AI</span>
+            <span className="font-bold text-gray-900 text-sm">Ogelytics AI</span>
           </div>
         </header>
 

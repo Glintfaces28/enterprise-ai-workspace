@@ -1360,6 +1360,54 @@ Learning:
 
 PDF text extraction often returns short lines or headings instead of clean paragraphs. Search logic should handle generic questions and skip weak passages so the chat feels useful even before adding a real LLM.
 
+Step 8: Fix login network error after backend port changed
+
+Problem:
+
+The login page showed:
+
+`Cannot connect to http://localhost:8013. Browser error: Network Error`
+
+Cause:
+
+The frontend was configured to call backend port `8013`, but no working FastAPI server was serving the API on that port.
+
+Updated:
+
+`enterprise-ai-workspace/frontend/.env`
+
+Purpose:
+
+Changed the active frontend API URL to:
+
+`VITE_API_URL=http://localhost:8020`
+
+Updated:
+
+`enterprise-ai-workspace/frontend/src/api/client.js`
+
+Purpose:
+
+Changed the fallback API URL to use backend port `8020`.
+
+Verification:
+
+Started FastAPI on port `8020`.
+
+Started Vite on port `5174`.
+
+Confirmed:
+
+`GET http://localhost:8020/health` returned `200 OK`.
+
+`OPTIONS http://localhost:8020/auth/login` from `http://localhost:5174` returned `200 OK`.
+
+`GET http://127.0.0.1:5174` returned `200 OK`.
+
+Learning:
+
+Vite reads `.env` when the dev server starts. After changing `VITE_API_URL`, the frontend dev server must be restarted or the browser may keep using the old backend URL.
+
 ---
 
 ## Module 6: Teams & Permissions

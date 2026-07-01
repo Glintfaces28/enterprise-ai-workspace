@@ -14,11 +14,11 @@ def is_configured(value: str, placeholder: str) -> bool:
 def send_password_reset_email(recipient_email: str, reset_token: str) -> bool:
     reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
 
-    subject = "Reset your Enterprise AI Workspace password"
+    subject = "Reset your Ogelytics AI Workspace password"
     body_html = f"""
     <html>
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #4F46E5;">Enterprise AI Workspace</h2>
+      <h2 style="color: #4F46E5;">Ogelytics AI Workspace</h2>
       <p>You requested a password reset. Click the button below to set a new password.</p>
       <p>This link expires in <strong>1 hour</strong>.</p>
       <a href="{reset_link}"

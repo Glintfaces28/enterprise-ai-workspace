@@ -60,6 +60,7 @@ Fixed the frontend registration connection issue by starting the FastAPI backend
 Fixed the local CORS configuration so the backend accepts frontend requests from both `localhost` and `127.0.0.1` dev URLs.
 Moved the active development backend to port `8010` because an old inaccessible process was still answering on port `8000`. The frontend `.env` now points to `http://localhost:8010`, and Vite is running on `http://127.0.0.1:5173`.
 Improved Module 5 AI Chat so broad questions like "what is this document about?" return useful PDF context instead of failing when there is no exact keyword match.
+Current local development ports: frontend runs on `http://127.0.0.1:5174`, backend runs on `http://localhost:8020`, and `frontend/.env` points to `VITE_API_URL=http://localhost:8020`.
 
 Files created:
 `enterprise-ai-workspace/backend/services/document_search.py`

@@ -35,7 +35,7 @@ export default function ForgotPassword() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
           <Brain className="text-indigo-400" size={34} />
-          <h1 className="text-white text-2xl font-bold">Enterprise AI Workspace</h1>
+          <h1 className="text-white text-2xl font-bold">Ogelytics AI Workspace</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
