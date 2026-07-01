@@ -1,3 +1,5 @@
+import os
+
 import models
 from database import Base, engine
 from fastapi import FastAPI
@@ -12,19 +14,25 @@ from routers.teams import router as teams_router
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Enterprise AI Workspace API",
+    title="Ogelytics AI Workspace API",
     version="1.0.0"
 )
 
+# Build allowed origins — localhost for dev, onrender.com for production
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):\d+|https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,7 +41,7 @@ app.add_middleware(
 
 @app.get("/")
 def home():
-    return {"message": "Enterprise AI Workspace API is running"}
+    return {"message": "Ogelytics AI Workspace API is running"}
 
 
 @app.get("/health")
